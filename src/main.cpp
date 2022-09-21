@@ -1,31 +1,5 @@
-#define GLEW_STATIC
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
-#include <SOIL/SOIL.h>
-#include <glm.hpp>
-#include <gtc/matrix_transform.hpp>
-#include <gtc/type_ptr.hpp>
-#include <iostream>
-
-#include "Shader.h"
-#include "Camera.h"
-
-using std::cout;
-using std::endl;
-
-
-
-// 窗口大小
-constexpr GLuint WIDTH = 800, HEIGHT = 600;
-
-// 摄像机
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
-bool keys[1024];
-GLfloat lastX = 400, lastY = 300;
-bool firstMouse = true;
-
-GLfloat deltaTime = 0.0f;
-GLfloat lastFrame = 0.0f;
+#include "global.h"
+#include "mesh_triangle.h"
 
 
 // Moves/alters the camera positions based on user input
@@ -126,6 +100,7 @@ int main()
     Shader shader_light("src/shaders/vertex_light.glsl", "src/shaders/fragment_light.glsl");
 
 
+    
     // 创建VBO（Vertex Buffer Objects）
     // VBO中存储了顶点的数据
     GLuint VBO;
@@ -135,63 +110,18 @@ int main()
     // EBO中存储了顶点在VBO中的索引
     GLuint EBO;
     glGenBuffers(1, &EBO);
+    
 
     // 创建VAO（Vertex Array Objects）
     // VAO中存储了顶点数据指针
     GLuint VAO;
     glGenVertexArrays(1, &VAO);
-
-
-    float vertices[] = {
-    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-     0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
-
-    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-     0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f,  0.0f, 1.0f,
-
-    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-    -0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-    -0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
-    -0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-    -0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
-
-     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-     0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-     0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
-     0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-     0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
-
-    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-     0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-     0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-    -0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
-    -0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
-
-    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-     0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-     0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-    -0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f
-    };
     
-    // 光源位置
-    constexpr glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
 
     // 绑定VAO
     glBindVertexArray(VAO); 
     {
+        
         // 绑定VBO
         glBindBuffer(GL_ARRAY_BUFFER, VBO);
         // 将顶点数据传入BUFFER
@@ -200,7 +130,7 @@ int main()
         // 绑定EBO
         //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
         // 将索引数据传入BUFFER
-       // glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+        //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
 
         // 设置顶点数据指针
         // 位置属性
@@ -209,11 +139,22 @@ int main()
         // 纹理坐标
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
         glEnableVertexAttribArray(1);
+        
+        
+
     }
     // 解绑VAO
     glBindVertexArray(0);
 
-    
+
+    int num_vertex;
+    GLuint VAO_2;
+    glGenVertexArrays(1, &VAO_2);
+ 
+    mesh_triangle mesh_1("obj/test.obj");
+    num_vertex = mesh_1.buffer_data(VAO_2);
+
+
     // 配置纹理1
     GLuint texture1;
     {
@@ -296,7 +237,7 @@ int main()
         projection = glm::perspective(camera.Zoom, (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
 
         // 绑定VAO
-        glBindVertexArray(VAO);
+        glBindVertexArray(VAO_2);
         {
             /*
                 绘制box
@@ -304,33 +245,47 @@ int main()
 
             // 计算M矩阵
             glm::mat4 model(1);
-            model = glm::translate(model, glm::vec3(0, 0, 0));
-            model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.91f, glm::vec3(0.0f, 0.0f, 1.0f));
-            model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.69f, glm::vec3(0.0f, 1.0f, 0.0f));
-            model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.43f, glm::vec3(1.0f, 0.0f, 0.0f));
+            //model = glm::translate(model, glm::vec3(0, 0, 0));
+            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.91f, glm::vec3(0.0f, 0.0f, 1.0f));
+            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.69f, glm::vec3(0.0f, 1.0f, 0.0f));
+            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.43f, glm::vec3(1.0f, 0.0f, 0.0f));
 
             // 激活着色器
             shader_box.Use();
 
-            // 获取变换矩阵地址
+            // uniform mat4 model
             GLint modelLoc = glGetUniformLocation(shader_box.Program, "model");
-            GLint viewLoc = glGetUniformLocation(shader_box.Program, "view");
-            GLint projLoc = glGetUniformLocation(shader_box.Program, "projection");
-
-            // 写入MVP矩阵
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+
+            // uniform mat4 view
+            GLint viewLoc = glGetUniformLocation(shader_box.Program, "view");
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+
+            // uniform mat4 projection
+            GLint projLoc = glGetUniformLocation(shader_box.Program, "projection");
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-            // 设置box和light的颜色
+            // uniform vec3 objectColor
             GLint objectColorLoc = glGetUniformLocation(shader_box.Program, "objectColor");
+            glUniform3f(objectColorLoc, 1.0f, 0.5f, 0.31f);
+
+            // uniform vec3 viewPos
+            GLint viewPosLoc = glGetUniformLocation(shader_box.Program, "viewPos");
+            glUniform3f(viewPosLoc, camera.Position.x, camera.Position.y, camera.Position.z);
+
+            // uniform vec3 lightColor
             GLint lightColorLoc = glGetUniformLocation(shader_box.Program, "lightColor");
-            glUniform3f(objectColorLoc, 1.0f, 0.5f, 0.31f);// 我们所熟悉的珊瑚红
-            glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f); // 依旧把光源设置为白色
+            glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
+
+            // uniform vec3 lightPos
+            GLint lightPosLoc = glGetUniformLocation(shader_box.Program, "lightPos");
+            glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
             // 绘制
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            //glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDrawElements(GL_TRIANGLES, num_vertex + 3, GL_UNSIGNED_INT, 0);
         }
+        glBindVertexArray(VAO);
         {
             /*
                 绘制light
