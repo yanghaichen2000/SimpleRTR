@@ -79,5 +79,5 @@ float vertices[] = {
 
 
 // π‚‘¥Œª÷√
-constexpr glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+constexpr glm::vec3 lightPos(0.0f, 1.99f, -6.0f);
 

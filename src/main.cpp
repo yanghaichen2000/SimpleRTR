@@ -1,5 +1,6 @@
 #include "global.h"
 #include "mesh_triangle.h"
+#include "texture.h"
 
 
 // Moves/alters the camera positions based on user input
@@ -151,67 +152,11 @@ int main()
     GLuint VAO_2;
     glGenVertexArrays(1, &VAO_2);
  
-    mesh_triangle mesh_1("obj/test.obj");
+    mesh_triangle mesh_1("obj/test_cow.obj");
     num_vertex = mesh_1.buffer_data(VAO_2);
 
 
-    // 配置纹理1
-    GLuint texture1;
-    {
-        // 生成纹理
-        glGenTextures(1, &texture1);
-
-        // 绑定
-        glBindTexture(GL_TEXTURE_2D, texture1);
-
-        // 设置重复方式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-        // 设置插值方式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        // 将图片载入到纹理
-        int tex_width, tex_height;
-        unsigned char* image = SOIL_load_image("obj/container.jpg", &tex_width, &tex_height, 0, SOIL_LOAD_RGB);
-        cout << tex_width << ' ' << tex_height << endl;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex_width, tex_height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-        glGenerateMipmap(GL_TEXTURE_2D); // 生成mipmap
-
-        // 释放内存并解绑
-        SOIL_free_image_data(image);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
-
-    // 配置纹理2
-    GLuint texture2;
-    {
-        // 生成纹理
-        glGenTextures(1, &texture2);
-
-        // 绑定
-        glBindTexture(GL_TEXTURE_2D, texture2);
-
-        // 设置重复方式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-
-        // 设置插值方式
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-        // 将图片载入到纹理
-        int tex_width, tex_height;
-        unsigned char* image = SOIL_load_image("obj/awesomeface.jpg", &tex_width, &tex_height, 0, SOIL_LOAD_RGB);
-        cout << tex_width << ' ' << tex_height << endl;
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex_width, tex_height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
-        glGenerateMipmap(GL_TEXTURE_2D); // 生成mipmap 194802026228
-
-        // 释放内存并解绑
-        SOIL_free_image_data(image);
-        glBindTexture(GL_TEXTURE_2D, 0);
-    }
+    texture tex1("obj/spot_texture.png");
     
     
     glEnable(GL_DEPTH_TEST);
@@ -267,7 +212,7 @@ int main()
 
             // uniform vec3 objectColor
             GLint objectColorLoc = glGetUniformLocation(shader_box.Program, "objectColor");
-            glUniform3f(objectColorLoc, 1.0f, 0.5f, 0.31f);
+            glUniform3f(objectColorLoc, 1.0f, 1.0f, 1.0f);
 
             // uniform vec3 viewPos
             GLint viewPosLoc = glGetUniformLocation(shader_box.Program, "viewPos");
@@ -280,6 +225,14 @@ int main()
             // uniform vec3 lightPos
             GLint lightPosLoc = glGetUniformLocation(shader_box.Program, "lightPos");
             glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
+
+            tex1.set_uniform(shader_box, "tex1", 0);
+
+            /*
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, texture1);
+            glUniform1i(glGetUniformLocation(shader_box.Program, "tex1"), 0);
+            */
 
             // 绘制
             //glDrawArrays(GL_TRIANGLES, 0, 36);
