@@ -1,6 +1,7 @@
 #include "global.h"
 #include "mesh_triangle.h"
-#include "texture.h"
+#include "material.h"
+#include "mesh.h"
 
 
 // Moves/alters the camera positions based on user input
@@ -140,24 +141,26 @@ int main()
         // 纹理坐标
         glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(GLfloat), (GLvoid*)(3 * sizeof(GLfloat)));
         glEnableVertexAttribArray(1);
-        
-        
-
     }
     // 解绑VAO
     glBindVertexArray(0);
 
 
-    int num_vertex;
-    GLuint VAO_2;
-    glGenVertexArrays(1, &VAO_2);
- 
-    mesh_triangle mesh_1("obj/test_cow.obj");
-    num_vertex = mesh_1.buffer_data(VAO_2);
+    //int num_vertex;
+    //GLuint VAO_2;
+    //glGenVertexArrays(1, &VAO_2);
 
+    shared_ptr<texture> tex1 = make_shared<texture>("obj/spot_texture.png");
+    shared_ptr<texture> tex2 = make_shared<texture>("obj/container.jpg");
+    shared_ptr<material> mat1 = make_shared<material>();
+    mat1->add_color_map(tex1);
+    mat1->add_color_map(tex2);
 
-    texture tex1("obj/spot_texture.png");
-    
+    mesh_triangle mesh_tmp("obj/test_cow.obj");
+    //num_vertex = mesh_1.buffer_data(VAO_2);
+    mesh mesh_1(mesh_tmp.mesh_list[6], mat1);
+    mesh_1.buffer_data();
+
     
     glEnable(GL_DEPTH_TEST);
     // 主循环
@@ -182,68 +185,55 @@ int main()
         projection = glm::perspective(camera.Zoom, (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
 
         // 绑定VAO
-        glBindVertexArray(VAO_2);
-        {
-            /*
-                绘制box
-            */
+        // 计算M矩阵
+        glm::mat4 model(1);
+        //model = glm::translate(model, glm::vec3(0, 0, 0));
+        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.91f, glm::vec3(0.0f, 0.0f, 1.0f));
+        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.69f, glm::vec3(0.0f, 1.0f, 0.0f));
+        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.43f, glm::vec3(1.0f, 0.0f, 0.0f));
 
-            // 计算M矩阵
-            glm::mat4 model(1);
-            //model = glm::translate(model, glm::vec3(0, 0, 0));
-            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.91f, glm::vec3(0.0f, 0.0f, 1.0f));
-            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.69f, glm::vec3(0.0f, 1.0f, 0.0f));
-            //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.43f, glm::vec3(1.0f, 0.0f, 0.0f));
+        // 激活着色器
+        shader_box.Use();
 
-            // 激活着色器
-            shader_box.Use();
+        // uniform mat4 model
+        GLint modelLoc = glGetUniformLocation(shader_box.Program, "model");
+        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
-            // uniform mat4 model
-            GLint modelLoc = glGetUniformLocation(shader_box.Program, "model");
-            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        // uniform mat4 view
+        GLint viewLoc = glGetUniformLocation(shader_box.Program, "view");
+        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
 
-            // uniform mat4 view
-            GLint viewLoc = glGetUniformLocation(shader_box.Program, "view");
-            glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        // uniform mat4 projection
+        GLint projLoc = glGetUniformLocation(shader_box.Program, "projection");
+        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
 
-            // uniform mat4 projection
-            GLint projLoc = glGetUniformLocation(shader_box.Program, "projection");
-            glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
+        // uniform vec3 objectColor
+        GLint objectColorLoc = glGetUniformLocation(shader_box.Program, "objectColor");
+        glUniform3f(objectColorLoc, 1.0f, 1.0f, 1.0f);
 
-            // uniform vec3 objectColor
-            GLint objectColorLoc = glGetUniformLocation(shader_box.Program, "objectColor");
-            glUniform3f(objectColorLoc, 1.0f, 1.0f, 1.0f);
+        // uniform vec3 viewPos
+        GLint viewPosLoc = glGetUniformLocation(shader_box.Program, "viewPos");
+        glUniform3f(viewPosLoc, camera.Position.x, camera.Position.y, camera.Position.z);
 
-            // uniform vec3 viewPos
-            GLint viewPosLoc = glGetUniformLocation(shader_box.Program, "viewPos");
-            glUniform3f(viewPosLoc, camera.Position.x, camera.Position.y, camera.Position.z);
+        // uniform vec3 lightColor
+        GLint lightColorLoc = glGetUniformLocation(shader_box.Program, "lightColor");
+        glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
 
-            // uniform vec3 lightColor
-            GLint lightColorLoc = glGetUniformLocation(shader_box.Program, "lightColor");
-            glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
+        // uniform vec3 lightPos
+        GLint lightPosLoc = glGetUniformLocation(shader_box.Program, "lightPos");
+        glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
-            // uniform vec3 lightPos
-            GLint lightPosLoc = glGetUniformLocation(shader_box.Program, "lightPos");
-            glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
 
-            tex1.set_uniform(shader_box, "tex1", 0);
+        /*
+            绘制box
+        */
+        mesh_1.draw(shader_box);
 
-            /*
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, texture1);
-            glUniform1i(glGetUniformLocation(shader_box.Program, "tex1"), 0);
-            */
-
-            // 绘制
-            //glDrawArrays(GL_TRIANGLES, 0, 36);
-            glDrawElements(GL_TRIANGLES, num_vertex + 3, GL_UNSIGNED_INT, 0);
-        }
+        /*
+            绘制light
+        */
         glBindVertexArray(VAO);
         {
-            /*
-                绘制light
-            */
-
             // 计算M矩阵
             glm::mat4 model(1);
             model = glm::translate(model, lightPos);

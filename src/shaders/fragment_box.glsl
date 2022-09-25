@@ -6,7 +6,8 @@ uniform vec3 viewPos;
 uniform vec3 lightColor;
 uniform vec3 lightPos;
 
-uniform sampler2D tex1;
+uniform sampler2D color_map_0;
+uniform sampler2D color_map_1;
 
 in vec3 Normal;
 in vec2 UV;
@@ -19,7 +20,8 @@ void main()
     vec3 wi = normalize(lightPos - FragPos);
     vec3 wo = normalize(viewPos - FragPos);
     vec3 h = normalize(wi + wo);
-    vec3 diffuse_color = vec3(pow(texture(tex1, UV).x, 2.2f), pow(texture(tex1, UV).y, 2.2f), pow(texture(tex1, UV).z, 2.2f));
+    vec3 diffuse_color = 0.5f * vec3(pow(texture(color_map_0, UV).x, 2.2f), pow(texture(color_map_0, UV).y, 2.2f), pow(texture(color_map_0, UV).z, 2.2f))
+        + 0.5f * vec3(pow(texture(color_map_1, UV).x, 2.2f), pow(texture(color_map_1, UV).y, 2.2f), pow(texture(color_map_1, UV).z, 2.2f));
     float distance_light_inv2 = 1.0f / dot(lightPos - FragPos, lightPos - FragPos);
     
     // »·¾³¹â

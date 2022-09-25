@@ -35,9 +35,7 @@ public:
 	}
     
     // 将该纹理设置为uniform变量
-    void set_uniform(Shader shader, const char name_in_shader[], int index) {
-
-
+    void make_uniform(Shader shader, const char name_in_shader[], int index) {
         glActiveTexture(GL_TEXTURE0 + index);
         glBindTexture(GL_TEXTURE_2D, texture_id);
         glUniform1i(glGetUniformLocation(shader.Program, name_in_shader), index);

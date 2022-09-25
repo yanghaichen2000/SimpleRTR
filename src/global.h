@@ -7,13 +7,19 @@
 #include <glm.hpp>
 #include <gtc/matrix_transform.hpp>
 #include <gtc/type_ptr.hpp>
+
+#include <memory>
 #include <iostream>
+#include <vector>
 
 #include "Shader.h"
 #include "Camera.h"
 
 using std::cout;
 using std::endl;
+using std::shared_ptr;
+using std::vector;
+using std::make_shared;
 
 
 // ´°¿Ú´óÐ¡
