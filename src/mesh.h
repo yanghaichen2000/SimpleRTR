@@ -111,9 +111,21 @@ public:
 	}
 
 	void draw(Shader shader) {
-		glBindVertexArray(VAO);
-		mat_ptr->make_uniform(shader);
-		glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
-		glBindVertexArray(0);
+		if (num_indices > 0) {
+			// 绑定VAO
+			glBindVertexArray(VAO);
+
+			// 加载材质
+			mat_ptr->make_uniform(shader);
+
+			// 绘制
+			glDrawElements(GL_TRIANGLES, num_indices, GL_UNSIGNED_INT, 0);
+
+			// 解绑VAO
+			glBindVertexArray(0);
+		}
+		else {
+			cout << "mesh::draw(): mesh data is not buffered\n";
+		}
 	}
 };

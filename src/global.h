@@ -11,6 +11,8 @@
 #include <memory>
 #include <iostream>
 #include <vector>
+#include <unordered_map>
+#include <string>
 
 #include "Shader.h"
 #include "Camera.h"
@@ -20,10 +22,12 @@ using std::endl;
 using std::shared_ptr;
 using std::vector;
 using std::make_shared;
+using std::unordered_map;
+using std::string;
 
 
 // 窗口大小
-constexpr GLuint WIDTH = 800, HEIGHT = 600;
+constexpr GLuint window_width = 1920, window_height = 1080;
 
 
 // 摄像机

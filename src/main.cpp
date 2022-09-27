@@ -1,7 +1,5 @@
 #include "global.h"
-#include "mesh_triangle.h"
-#include "material.h"
-#include "mesh.h"
+#include "object.h"
 
 
 // Moves/alters the camera positions based on user input
@@ -69,7 +67,7 @@ int main()
     glfwWindowHint(GLFW_SAMPLES, 4);
 
     // 创建glfw窗口对象
-    GLFWwindow* window = glfwCreateWindow(WIDTH, HEIGHT, "LearnOpenGL", nullptr, nullptr);
+    GLFWwindow* window = glfwCreateWindow(window_width, window_height, "LearnOpenGL", nullptr, nullptr);
     if (window == nullptr)
     {
         std::cout << "Failed to create GLFW window" << std::endl;
@@ -150,16 +148,35 @@ int main()
     //GLuint VAO_2;
     //glGenVertexArrays(1, &VAO_2);
 
-    shared_ptr<texture> tex1 = make_shared<texture>("obj/spot_texture.png");
-    shared_ptr<texture> tex2 = make_shared<texture>("obj/container.jpg");
-    shared_ptr<material> mat1 = make_shared<material>();
-    mat1->add_color_map(tex1);
-    mat1->add_color_map(tex2);
+    // 定义材质
+    shared_ptr<material> mat_cow = make_shared<material>();
+    shared_ptr<texture> tex_cow = make_shared<texture>("obj/spot_texture.png");
+    mat_cow->add_color_map(tex_cow);
+    
+    shared_ptr<material> mat_white = make_shared<material>();
+    shared_ptr<texture> tex_white = make_shared<texture>("obj/white.png");
+    mat_white->add_color_map(tex_white);
 
-    mesh_triangle mesh_tmp("obj/test_cow.obj");
-    //num_vertex = mesh_1.buffer_data(VAO_2);
-    mesh mesh_1(mesh_tmp.mesh_list[6], mat1);
-    mesh_1.buffer_data();
+    shared_ptr<material> mat_green = make_shared<material>();
+    shared_ptr<texture> tex_green = make_shared<texture>("obj/green.png");
+    mat_green->add_color_map(tex_green);
+
+    shared_ptr<material> mat_red = make_shared<material>();
+    shared_ptr<texture> tex_red = make_shared<texture>("obj/red.png");
+    mat_red->add_color_map(tex_red);
+
+    // 材质表
+    unordered_map<string, shared_ptr<material>> material_dict;
+    material_dict[string("cube")] = mat_white;
+    material_dict[string("cow")] = mat_cow;
+    material_dict[string("plane_001")] = mat_red;
+    material_dict[string("plane_002")] = mat_white;
+    material_dict[string("plane_003")] = mat_white;
+    material_dict[string("plane_004")] = mat_green;
+    material_dict[string("plane_005")] = mat_white;
+
+    object object_tmp("obj/test_cow.obj", material_dict);
+    object_tmp.buffer_data();
 
     
     glEnable(GL_DEPTH_TEST);
@@ -182,7 +199,7 @@ int main()
         glm::mat4 view;
         view = camera.GetViewMatrix();
         glm::mat4 projection;
-        projection = glm::perspective(camera.Zoom, (float)WIDTH / (float)HEIGHT, 0.1f, 1000.0f);
+        projection = glm::perspective(camera.Zoom, (float)window_width / (float)window_height, 0.1f, 1000.0f);
 
         // 绑定VAO
         // 计算M矩阵
@@ -227,7 +244,7 @@ int main()
         /*
             绘制box
         */
-        mesh_1.draw(shader_box);
+        object_tmp.draw(shader_box);
 
         /*
             绘制light
