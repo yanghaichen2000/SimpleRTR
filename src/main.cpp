@@ -163,9 +163,13 @@ int main()
     shared_ptr<texture> tex_red = make_shared<texture>("obj/red.png");
     mat_red->add_color_map(tex_red);
 
+    shared_ptr<material> mat_yellow = make_shared<material>();
+    shared_ptr<texture> tex_yellow = make_shared<texture>("obj/yellow.png");
+    mat_yellow->add_color_map(tex_yellow);
+
     // 材质表
     unordered_map<string, shared_ptr<material>> material_dict;
-    material_dict[string("cube")] = mat_white;
+    material_dict[string("cube")] = mat_yellow;
     material_dict[string("cow")] = mat_cow;
     material_dict[string("plane_001")] = mat_red;
     material_dict[string("plane_002")] = mat_white;
@@ -215,7 +219,7 @@ int main()
 
     // 光源的P矩阵
     GLfloat near_plane = -1.0f, far_plane = 15.0f;
-    glm::mat4 projection_light = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+    glm::mat4 projection_light = glm::ortho(-8.0f, 8.0f, -8.0f, 8.0f, near_plane, far_plane);
 
     // 激活深度图着色器
     shader_depth.Use();
@@ -250,7 +254,7 @@ int main()
     mat_white->add_shadow_map(shadow_map_ptr);
     mat_green->add_shadow_map(shadow_map_ptr);
     mat_red->add_shadow_map(shadow_map_ptr);
-    
+    mat_yellow->add_shadow_map(shadow_map_ptr);
     
     glEnable(GL_DEPTH_TEST);
     // 主循环
