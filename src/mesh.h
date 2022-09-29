@@ -46,17 +46,17 @@ public:
 		float* attribute_array = new float[num_vertex * 8];
 
 		// 将属性信息放入attribute_array
-		int vertex_index = 0; // 顶点编号
+		int index_vertex = 0; // 顶点编号
 		for (const objl::Vertex& vertex : mesh_data.Vertices) {
-			attribute_array[vertex_index * 8 + 0] = -vertex.Position.Z; // 这里的位置进行了一些变换
-			attribute_array[vertex_index * 8 + 1] = vertex.Position.Y;
-			attribute_array[vertex_index * 8 + 2] = vertex.Position.X;
-			attribute_array[vertex_index * 8 + 3] = -vertex.Normal.Z; // 这里的位置进行了一些变换
-			attribute_array[vertex_index * 8 + 4] = vertex.Normal.Y;
-			attribute_array[vertex_index * 8 + 5] = vertex.Normal.X;
-			attribute_array[vertex_index * 8 + 6] = vertex.TextureCoordinate.X;
-			attribute_array[vertex_index * 8 + 7] = vertex.TextureCoordinate.Y;
-			vertex_index++;
+			attribute_array[index_vertex * 8 + 0] = -vertex.Position.Z; // 这里的位置进行了一些变换
+			attribute_array[index_vertex * 8 + 1] = vertex.Position.Y;
+			attribute_array[index_vertex * 8 + 2] = vertex.Position.X;
+			attribute_array[index_vertex * 8 + 3] = -vertex.Normal.Z; // 这里的位置进行了一些变换
+			attribute_array[index_vertex * 8 + 4] = vertex.Normal.Y;
+			attribute_array[index_vertex * 8 + 5] = vertex.Normal.X;
+			attribute_array[index_vertex * 8 + 6] = vertex.TextureCoordinate.X;
+			attribute_array[index_vertex * 8 + 7] = vertex.TextureCoordinate.Y;
+			index_vertex++;
 		}
 
 		// 计算索引个数（是三角形个数的三倍）

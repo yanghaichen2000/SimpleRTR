@@ -7,6 +7,7 @@ public:
 
 	GLuint texture_id;
 	
+    // 从图片中载入
 	texture(const char filename[], GLint repeat = GL_REPEAT, GLint interpolate = GL_LINEAR) {
         // 创建纹理
         glGenTextures(1, &texture_id);
@@ -33,6 +34,13 @@ public:
         SOIL_free_image_data(image);
         glBindTexture(GL_TEXTURE_2D, 0);
 	}
+
+    // 设置现有texture
+    texture(GLuint texture_id_init) {
+        texture_id = texture_id_init;
+
+        cout << "texture::init() texture loaded from gl_texture";
+    }
     
     // 将该纹理设置为uniform变量
     void make_uniform(Shader shader, const char name_in_shader[], int index) {

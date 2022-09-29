@@ -2,7 +2,6 @@
 #include "object.h"
 
 
-// Moves/alters the camera positions based on user input
 void Do_Movement()
 {
     // Camera controls
@@ -16,7 +15,6 @@ void Do_Movement()
         camera.ProcessKeyboard(RIGHT, deltaTime);
 }
 
-// Is called whenever a key is pressed/released via GLFW
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mode)
 {
     //cout << key << endl;
@@ -41,7 +39,7 @@ void mouse_callback(GLFWwindow* window, double xpos, double ypos)
     }
 
     GLfloat xoffset = xpos - lastX;
-    GLfloat yoffset = lastY - ypos;  // Reversed since y-coordinates go from bottom to left
+    GLfloat yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
@@ -98,7 +96,7 @@ int main()
     // 设置shader
     Shader shader_box("src/shaders/vertex_box.glsl", "src/shaders/fragment_box.glsl");
     Shader shader_light("src/shaders/vertex_light.glsl", "src/shaders/fragment_light.glsl");
-
+    Shader shader_depth("src/shaders/vertex_depth.glsl", "src/shaders/fragment_depth.glsl");
 
     
     // 创建VBO（Vertex Buffer Objects）
@@ -175,9 +173,84 @@ int main()
     material_dict[string("plane_004")] = mat_green;
     material_dict[string("plane_005")] = mat_white;
 
+
+    // buffer顶点信息
     object object_tmp("obj/test_cow.obj", material_dict);
     object_tmp.buffer_data();
 
+
+    // 定义shadow map
+    const GLuint SHADOW_WIDTH = 1024, SHADOW_HEIGHT = 1024;
+
+    GLuint depthMap;
+    glGenTextures(1, &depthMap);
+    glBindTexture(GL_TEXTURE_2D, depthMap);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT,
+        SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+
+    // 创建FBO
+    GLuint depthMapFBO;
+    glGenFramebuffers(1, &depthMapFBO);
+
+    // 将shadowmap绑定到FBO
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthMap, 0);
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+    // 获取深度图并将其添加到材质materia中
+
+    // 光源的M矩阵
+    glm::mat4 model_light(1);
+
+    // 光源的V矩阵
+    glm::mat4 view_light = glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, -1.0f, -1.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // 光源的P矩阵
+    GLfloat near_plane = -1.0f, far_plane = 15.0f;
+    glm::mat4 projection_light = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, near_plane, far_plane);
+
+    // 激活深度图着色器
+    shader_depth.Use();
+
+    // uniform mat4 model
+    GLint modelLoc = glGetUniformLocation(shader_depth.Program, "model");
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model_light));
+
+    // uniform mat4 view
+    GLint viewLoc = glGetUniformLocation(shader_depth.Program, "view");
+    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view_light));
+
+    // uniform mat4 projection
+    GLint projLoc = glGetUniformLocation(shader_depth.Program, "projection");
+    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection_light));
+
+    // 将视口大小设置为深度图大小
+    glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+
+    // 将深度渲染到深度图
+    glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+    {
+        glClear(GL_DEPTH_BUFFER_BIT);
+        object_tmp.draw(shader_depth);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
+    
+    // 将shadow_map存入material中
+    shared_ptr<texture> shadow_map_ptr = make_shared<texture>(depthMap);
+    mat_cow->add_shadow_map(shadow_map_ptr);
+    mat_white->add_shadow_map(shadow_map_ptr);
+    mat_green->add_shadow_map(shadow_map_ptr);
+    mat_red->add_shadow_map(shadow_map_ptr);
+    
     
     glEnable(GL_DEPTH_TEST);
     // 主循环
@@ -195,60 +268,57 @@ int main()
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+
+        // 将视口大小设置为深度图大小
+        glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+
+        // 将深度渲染到深度图
+        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
+        {
+            glClear(GL_DEPTH_BUFFER_BIT);
+            object_tmp.draw(shader_depth);
+        }
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+        // 清空颜色缓冲
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+       
         // 根据摄像机状态获取V和P矩阵
         glm::mat4 view;
         view = camera.GetViewMatrix();
         glm::mat4 projection;
         projection = glm::perspective(camera.Zoom, (float)window_width / (float)window_height, 0.1f, 1000.0f);
 
-        // 绑定VAO
-        // 计算M矩阵
+        // M矩阵
         glm::mat4 model(1);
-        //model = glm::translate(model, glm::vec3(0, 0, 0));
-        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.91f, glm::vec3(0.0f, 0.0f, 1.0f));
-        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.69f, glm::vec3(0.0f, 1.0f, 0.0f));
-        //model = glm::rotate(model, (GLfloat)glfwGetTime() * 0.43f, glm::vec3(1.0f, 0.0f, 0.0f));
+        
 
         // 激活着色器
         shader_box.Use();
 
-        // uniform mat4 model
-        GLint modelLoc = glGetUniformLocation(shader_box.Program, "model");
-        glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+        // 设置uniform
+        shader_box.set_uniform_mat4("model", model);
+        shader_box.set_uniform_mat4("view", view);
+        shader_box.set_uniform_mat4("projection", projection);
 
-        // uniform mat4 view
-        GLint viewLoc = glGetUniformLocation(shader_box.Program, "view");
-        glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
+        shader_box.set_uniform_vec3("viewPos", camera.Position);
+        shader_box.set_uniform_vec3("lightColor", 1.0f, 1.0f, 1.0f);
+        shader_box.set_uniform_vec3("lightPos", lightPos);
+        shader_box.set_uniform_vec3("lightDir", 1.0f, 1.0f, 1.0f);
 
-        // uniform mat4 projection
-        GLint projLoc = glGetUniformLocation(shader_box.Program, "projection");
-        glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-
-        // uniform vec3 objectColor
-        GLint objectColorLoc = glGetUniformLocation(shader_box.Program, "objectColor");
-        glUniform3f(objectColorLoc, 1.0f, 1.0f, 1.0f);
-
-        // uniform vec3 viewPos
-        GLint viewPosLoc = glGetUniformLocation(shader_box.Program, "viewPos");
-        glUniform3f(viewPosLoc, camera.Position.x, camera.Position.y, camera.Position.z);
-
-        // uniform vec3 lightColor
-        GLint lightColorLoc = glGetUniformLocation(shader_box.Program, "lightColor");
-        glUniform3f(lightColorLoc, 1.0f, 1.0f, 1.0f);
-
-        // uniform vec3 lightPos
-        GLint lightPosLoc = glGetUniformLocation(shader_box.Program, "lightPos");
-        glUniform3f(lightPosLoc, lightPos.x, lightPos.y, lightPos.z);
-
-
-        /*
-            绘制box
-        */
+        shader_box.set_uniform_mat4("model_light", model_light);
+        shader_box.set_uniform_mat4("view_light", view_light);
+        shader_box.set_uniform_mat4("projection_light", projection_light);
+        
+        // 绘制box
+        glViewport(0, 0, window_width, window_height);
         object_tmp.draw(shader_box);
 
-        /*
-            绘制light
-        */
+        
+        // 绘制light
         glBindVertexArray(VAO);
         {
             // 计算M矩阵
@@ -274,6 +344,8 @@ int main()
         }
         // 解绑VAO
         glBindVertexArray(0);
+      
+        
 
         // 交换颜色缓冲
         glfwSwapBuffers(window);

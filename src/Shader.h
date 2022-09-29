@@ -105,4 +105,19 @@ public:
     void Use() {
         glUseProgram(Program);
     }
+
+    void set_uniform_vec3(const char value_name[], float vec3_0, float vec3_1, float vec3_2) {
+        GLint location = glGetUniformLocation(Program, value_name);
+        glUniform3f(location, vec3_0, vec3_1, vec3_2);
+    }
+
+    void set_uniform_vec3(const char value_name[], glm::vec3 vec) {
+        GLint location = glGetUniformLocation(Program, value_name);
+        glUniform3f(location, vec.x, vec.y, vec.z);
+    }
+
+    void set_uniform_mat4(const char value_name[], glm::mat4 mat) {
+        GLint location = glGetUniformLocation(Program, value_name);
+        glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
+    }
 };
