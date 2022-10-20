@@ -110,6 +110,7 @@ public:
 		delete[] index_array;
 	}
 
+	// 调用前注意使用shader.Use()
 	void draw(Shader shader) {
 		if (num_indices > 0) {
 			// 绑定VAO

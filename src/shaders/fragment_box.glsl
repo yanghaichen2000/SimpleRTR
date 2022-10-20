@@ -136,7 +136,4 @@ void main()
 
     // gammaÐ£Õý
     color = vec4(pow(color.x, 1.0f / 2.2f), pow(color.y, 1.0f / 2.2f), pow(color.z, 1.0f / 2.2f), 1.0f);
-
-    //color = vec4(vec3(depth_light + 1.0f) * 0.5f, 1.0f);
-    //color = vec4(vec3(texture(shadow_map_0, uv_light).r), 1.0f);
 }

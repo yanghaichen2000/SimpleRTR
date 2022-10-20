@@ -2,6 +2,25 @@
 #include "object.h"
 
 
+//#define TEST_MODE_SIMPLERTR
+
+
+#ifdef TEST_MODE_SIMPLERTR
+int main() {
+    stb::stbi_set_flip_vertically_on_load(true);
+    int width, height, nrComponents;
+    // 遍历顺序：
+    // 8 9 a b
+    // 4 5 6 7
+    // 0 1 2 3
+    float* data = stb::stbi_loadf("obj/bridge.hdr", &width, &height, &nrComponents, 0);
+    
+    // 输出hdr图像
+    //stb::stbi_write_hdr("obj/test_write.hdr", width, height, nrComponents, data);
+}
+#endif
+
+#ifndef TEST_MODE_SIMPLERTR
 void Do_Movement()
 {
     // Camera controls
@@ -54,6 +73,7 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 }
 
 
+
 int main()
 {
     // 实例化glfw窗口
@@ -94,9 +114,10 @@ int main()
     glfwSetScrollCallback(window, scroll_callback);
 
     // 设置shader
-    Shader shader_box("src/shaders/vertex_box.glsl", "src/shaders/fragment_box.glsl");
+    Shader shader_main("src/shaders/vertex_box.glsl", "src/shaders/fragment_box.glsl");
     Shader shader_light("src/shaders/vertex_light.glsl", "src/shaders/fragment_light.glsl");
     Shader shader_depth("src/shaders/vertex_depth.glsl", "src/shaders/fragment_depth.glsl");
+    Shader shader_hdr("src/shaders/vertex_hdr.glsl", "src/shaders/fragment_hdr.glsl");
 
     
     // 创建VBO（Vertex Buffer Objects）
@@ -167,8 +188,14 @@ int main()
     shared_ptr<texture> tex_yellow = make_shared<texture>("obj/yellow.png");
     mat_yellow->add_color_map(tex_yellow);
 
+    shared_ptr<material> mat_hdr_test = make_shared<material>();
+    shared_ptr<texture> tex_hdr_test = make_shared<texture>("bridge.hdr", texture_type::hdr);
+    mat_hdr_test->add_color_map(tex_hdr_test);
+
+
     // 材质表
     unordered_map<string, shared_ptr<material>> material_dict;
+    material_dict[string("hdr_cube")] = mat_hdr_test;
     material_dict[string("cube")] = mat_yellow;
     material_dict[string("cow")] = mat_cow;
     material_dict[string("plane_001")] = mat_red;
@@ -178,9 +205,13 @@ int main()
     material_dict[string("plane_005")] = mat_white;
 
 
-    // buffer顶点信息
-    object object_tmp("obj/test_cow.obj", material_dict);
-    object_tmp.buffer_data();
+    // 读取并buffer模型
+    object object_main("obj/test_cow_open.obj", material_dict);
+    object_main.buffer_data();
+
+    // 读取并buffer hdr模型
+    object object_hdr("obj/test_cube.obj", material_dict);
+    object_hdr.buffer_data();
 
 
     // 定义shadow map
@@ -207,10 +238,10 @@ int main()
     glDrawBuffer(GL_NONE);
     glReadBuffer(GL_NONE);
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
 
-
-    // 获取深度图并将其添加到材质materia中
-
+    // 获取深度图并将其添加到材质material中
+    
     // 光源的M矩阵
     glm::mat4 model_light(1);
 
@@ -224,28 +255,23 @@ int main()
     // 激活深度图着色器
     shader_depth.Use();
 
-    // uniform mat4 model
-    GLint modelLoc = glGetUniformLocation(shader_depth.Program, "model");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model_light));
-
-    // uniform mat4 view
-    GLint viewLoc = glGetUniformLocation(shader_depth.Program, "view");
-    glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view_light));
-
-    // uniform mat4 projection
-    GLint projLoc = glGetUniformLocation(shader_depth.Program, "projection");
-    glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection_light));
+    // 传入光源shader参数
+    shader_depth.set_uniform_mat4("model", model_light);
+    shader_depth.set_uniform_mat4("view", view_light);
+    shader_depth.set_uniform_mat4("projection", projection_light);
 
     // 将视口大小设置为深度图大小
     glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
+    glEnable(GL_DEPTH_TEST);
     // 将深度渲染到深度图
     glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
     {
         glClear(GL_DEPTH_BUFFER_BIT);
-        object_tmp.draw(shader_depth);
+        object_main.draw(shader_depth);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
     
     
     // 将shadow_map存入material中
@@ -256,7 +282,7 @@ int main()
     mat_red->add_shadow_map(shadow_map_ptr);
     mat_yellow->add_shadow_map(shadow_map_ptr);
     
-    glEnable(GL_DEPTH_TEST);
+
     // 主循环
     while (!glfwWindowShouldClose(window)) {
         // Set frame time
@@ -276,14 +302,6 @@ int main()
         // 将视口大小设置为深度图大小
         glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 
-        // 将深度渲染到深度图
-        glBindFramebuffer(GL_FRAMEBUFFER, depthMapFBO);
-        {
-            glClear(GL_DEPTH_BUFFER_BIT);
-            object_tmp.draw(shader_depth);
-        }
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
 
         // 清空颜色缓冲
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
@@ -300,27 +318,45 @@ int main()
         glm::mat4 model(1);
         
 
-        // 激活着色器
-        shader_box.Use();
+        // 绘制场景
+        {
+            // 激活着色器
+            shader_main.Use();
 
-        // 设置uniform
-        shader_box.set_uniform_mat4("model", model);
-        shader_box.set_uniform_mat4("view", view);
-        shader_box.set_uniform_mat4("projection", projection);
+            // 设置uniform
+            shader_main.set_uniform_mat4("model", model);
+            shader_main.set_uniform_mat4("view", view);
+            shader_main.set_uniform_mat4("projection", projection);
 
-        shader_box.set_uniform_vec3("viewPos", camera.Position);
-        shader_box.set_uniform_vec3("lightColor", 1.0f, 1.0f, 1.0f);
-        shader_box.set_uniform_vec3("lightPos", lightPos);
-        shader_box.set_uniform_vec3("lightDir", 1.0f, 1.0f, 1.0f);
+            shader_main.set_uniform_vec3("viewPos", camera.Position);
+            shader_main.set_uniform_vec3("lightColor", 5.0f, 5.0f, 5.0f);
+            shader_main.set_uniform_vec3("lightPos", lightPos);
+            shader_main.set_uniform_vec3("lightDir", 1.0f, 1.0f, 1.0f);
+            
+            shader_main.set_uniform_mat4("model_light", model_light);
+            shader_main.set_uniform_mat4("view_light", view_light);
+            shader_main.set_uniform_mat4("projection_light", projection_light);
 
-        shader_box.set_uniform_mat4("model_light", model_light);
-        shader_box.set_uniform_mat4("view_light", view_light);
-        shader_box.set_uniform_mat4("projection_light", projection_light);
+            // 绘制
+            glViewport(0, 0, window_width, window_height);
+            object_main.draw(shader_main);
+        }
         
-        // 绘制box
-        glViewport(0, 0, window_width, window_height);
-        object_tmp.draw(shader_box);
+        // 绘制天空盒
+        {
+            // 激活着色器
+            shader_hdr.Use();
 
+            // 设置uniform
+            shader_hdr.set_uniform_mat4("view", view);
+            shader_hdr.set_uniform_mat4("projection", projection);
+            shader_hdr.set_uniform_vec3("viewPos", camera.Position);
+
+            // 绘制
+            glViewport(0, 0, window_width, window_height);
+            glDepthFunc(GL_LEQUAL); // 由于在shader中让天空盒的深度为1，所以需要加这一句
+            object_hdr.draw(shader_hdr);
+        }
         
         // 绘制light
         glBindVertexArray(VAO);
@@ -361,3 +397,4 @@ int main()
     return 0;
 }
 
+#endif
