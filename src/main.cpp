@@ -118,6 +118,7 @@ int main()
     Shader shader_light("src/shaders/vertex_light.glsl", "src/shaders/fragment_light.glsl");
     Shader shader_depth("src/shaders/vertex_depth.glsl", "src/shaders/fragment_depth.glsl");
     Shader shader_hdr("src/shaders/vertex_hdr.glsl", "src/shaders/fragment_hdr.glsl");
+    Shader shader_hdrcube("src/shaders/vertex_hdrcube.glsl", "src/shaders/fragment_hdrcube.glsl");
 
     
     // 创建VBO（Vertex Buffer Objects）
@@ -272,8 +273,6 @@ int main()
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
-    
-    
     // 将shadow_map存入material中
     shared_ptr<texture> shadow_map_ptr = make_shared<texture>(depthMap);
     mat_cow->add_shadow_map(shadow_map_ptr);
@@ -281,7 +280,71 @@ int main()
     mat_green->add_shadow_map(shadow_map_ptr);
     mat_red->add_shadow_map(shadow_map_ptr);
     mat_yellow->add_shadow_map(shadow_map_ptr);
+
+
+    // 预处理hdri
+
+    // 帧缓冲对象，用于记录圆柱投影转换到立方体贴图的结果
+    unsigned int captureFBO, captureRBO;
+    glGenFramebuffers(1, &captureFBO);
+    glGenRenderbuffers(1, &captureRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
     
+    // 为立方体贴图分配缓存
+    unsigned int envCubemap;
+    glGenTextures(1, &envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        // 格式为16位浮点数
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
+            512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 设置V矩阵和P矩阵
+    // P矩阵的fov为pi/2
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    // V矩阵的ViewPos为原点，方向为六个坐标轴方向
+    glm::mat4 captureViews[] =
+    {
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+    };
+
+    // 使用渲染hdri的shader
+    shader_hdr.Use();
+    shader_hdr.set_uniform_mat4("projection", captureProjection);
+
+    // 开始渲染六个面，并将framebuffer导入到材质
+    glViewport(0, 0, 512, 512);
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        // 传入当前面的
+        shader_hdr.set_uniform_mat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+            GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glDepthFunc(GL_LEQUAL);
+        object_hdr.draw(shader_hdr); // renders a 1x1 cube
+        glDepthFunc(GL_LESS);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 
     // 主循环
     while (!glfwWindowShouldClose(window)) {
@@ -342,7 +405,8 @@ int main()
             object_main.draw(shader_main);
         }
         
-        // 绘制天空盒
+        /*
+        // 绘制天空盒（直接从.hdr图绘制）
         {
             // 激活着色器
             shader_hdr.Use();
@@ -350,12 +414,25 @@ int main()
             // 设置uniform
             shader_hdr.set_uniform_mat4("view", view);
             shader_hdr.set_uniform_mat4("projection", projection);
-            shader_hdr.set_uniform_vec3("viewPos", camera.Position);
+            //shader_hdr.set_uniform_mat4("view", captureViews[3]);
+            //shader_hdr.set_uniform_mat4("projection", captureProjection);
 
             // 绘制
             glViewport(0, 0, window_width, window_height);
             glDepthFunc(GL_LEQUAL); // 由于在shader中让天空盒的深度为1，所以需要加这一句
             object_hdr.draw(shader_hdr);
+        }
+        */
+
+        // 绘制天空盒（根据转换的立方体贴图绘制）
+        {
+            shader_hdrcube.Use();
+            glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+            shader_hdrcube.set_uniform_mat4("view", view);
+            shader_hdrcube.set_uniform_mat4("projection", projection);
+            glViewport(0, 0, window_width, window_height);
+            glDepthFunc(GL_LEQUAL); // 由于在shader中让天空盒的深度为1，所以需要加这一句
+            object_hdr.draw(shader_hdrcube);
         }
         
         // 绘制light

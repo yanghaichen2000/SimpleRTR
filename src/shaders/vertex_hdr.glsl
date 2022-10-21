@@ -6,6 +6,7 @@ out vec3 localPos;
 uniform mat4 projection;
 uniform mat4 view;
 
+
 void main()
 {
     localPos = position;  
