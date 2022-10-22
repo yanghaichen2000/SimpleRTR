@@ -13,12 +13,15 @@ uniform mat4 projection_light;
 uniform sampler2D color_map_0;
 uniform sampler2D shadow_map_0;
 
+uniform samplerCube environmentMap;
+
 in vec3 Normal;
 in vec2 UV;
 in vec3 FragPos;
 
 #define PI 3.141592653589793
 #define PI_MUL_2 6.283185307179586
+#define PI_INV 0.318309886
 
 
 // 随机数生成器，范围[0, 1)
@@ -115,11 +118,12 @@ void main()
     vec3 wi = normalize(lightDir); // 平行光
     vec3 wo = normalize(viewPos - FragPos);
     vec3 h = normalize(wi + wo);
-    vec3 diffuse_color = 0.5f * vec3(pow(texture(color_map_0, UV).x, 2.2f), pow(texture(color_map_0, UV).y, 2.2f), pow(texture(color_map_0, UV).z, 2.2f));
+    vec3 diffuse_color = 1.0f * vec3(pow(texture(color_map_0, UV).x, 2.2f), pow(texture(color_map_0, UV).y, 2.2f), pow(texture(color_map_0, UV).z, 2.2f));
     float distance_light_inv2 = 1.0f / dot(lightPos - FragPos, lightPos - FragPos);
     
     // 环境光
-    vec3 ambient = 0.02f * diffuse_color;
+    //vec3 ambient = 0.02f * diffuse_color;
+    vec3 ambient = 1.0f * texture(environmentMap, Normal).rgb * PI_INV * diffuse_color;
     
     // 漫反射项
     vec3 diffuse = diffuse_color * lightColor * dot(normal, wi) * distance_light_inv2;

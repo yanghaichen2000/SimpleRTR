@@ -119,6 +119,7 @@ int main()
     Shader shader_depth("src/shaders/vertex_depth.glsl", "src/shaders/fragment_depth.glsl");
     Shader shader_hdr("src/shaders/vertex_hdr.glsl", "src/shaders/fragment_hdr.glsl");
     Shader shader_hdrcube("src/shaders/vertex_hdrcube.glsl", "src/shaders/fragment_hdrcube.glsl");
+    Shader shader_irradiance("src/shaders/vertex_irradiance.glsl", "src/shaders/fragment_irradiance.glsl");
 
     
     // 创建VBO（Vertex Buffer Objects）
@@ -190,7 +191,7 @@ int main()
     mat_yellow->add_color_map(tex_yellow);
 
     shared_ptr<material> mat_hdr_test = make_shared<material>();
-    shared_ptr<texture> tex_hdr_test = make_shared<texture>("bridge.hdr", texture_type::hdr);
+    shared_ptr<texture> tex_hdr_test = make_shared<texture>("obj/hdri/bridge.hdr", texture_type::hdr);
     mat_hdr_test->add_color_map(tex_hdr_test);
 
 
@@ -282,7 +283,7 @@ int main()
     mat_yellow->add_shadow_map(shadow_map_ptr);
 
 
-    // 预处理hdri
+    // 将hdri转换为立方体贴图
 
     // 帧缓冲对象，用于记录圆柱投影转换到立方体贴图的结果
     unsigned int captureFBO, captureRBO;
@@ -328,22 +329,72 @@ int main()
     shader_hdr.Use();
     shader_hdr.set_uniform_mat4("projection", captureProjection);
 
-    // 开始渲染六个面，并将framebuffer导入到材质
+    // 开始渲染六个面，并将渲染结果写入立方体贴图
     glViewport(0, 0, 512, 512);
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for (unsigned int i = 0; i < 6; ++i)
     {
-        // 传入当前面的
+        // 传入当前面的V矩阵
         shader_hdr.set_uniform_mat4("view", captureViews[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-            GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glDepthFunc(GL_LEQUAL);
-        object_hdr.draw(shader_hdr); // renders a 1x1 cube
+        object_hdr.draw(shader_hdr);
         glDepthFunc(GL_LESS);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    
+    // 根据立方体贴图计算辐照度图
+
+    // 为辐照度图分配内存
+    unsigned int irradianceMap;
+    glGenTextures(1, &irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 帧缓冲对象，用于记录计算辐照度
+    unsigned int irradianceFBO, irradianceRBO;
+    glGenFramebuffers(1, &irradianceFBO);
+    glGenRenderbuffers(1, &irradianceRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, irradianceFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, irradianceRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, irradianceRBO);
+
+    // 使用计算irradiance的shader
+    shader_irradiance.Use();
+    shader_irradiance.set_uniform_mat4("projection", captureProjection);
+
+    // 传入之前计算的立方体贴图
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+    // 开始渲染六个面，并将渲染结果写入立方体贴图
+    glViewport(0, 0, 32, 32);
+    glBindFramebuffer(GL_FRAMEBUFFER, irradianceFBO);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        shader_irradiance.set_uniform_mat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        glDepthFunc(GL_LEQUAL);
+        object_hdr.draw(shader_irradiance);
+        glDepthFunc(GL_LESS);
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    
 
 
     // 主循环
@@ -380,11 +431,16 @@ int main()
         // M矩阵
         glm::mat4 model(1);
         
-
+        
         // 绘制场景
         {
             // 激活着色器
             shader_main.Use();
+
+            // 设置环境纹理
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+            glUniform1i(glGetUniformLocation(shader_main.Program, "environmentMap"), 2);
 
             // 设置uniform
             shader_main.set_uniform_mat4("model", model);
@@ -405,6 +461,7 @@ int main()
             object_main.draw(shader_main);
         }
         
+        
         /*
         // 绘制天空盒（直接从.hdr图绘制）
         {
@@ -424,16 +481,22 @@ int main()
         }
         */
 
+        
         // 绘制天空盒（根据转换的立方体贴图绘制）
         {
             shader_hdrcube.Use();
+
+            glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
             shader_hdrcube.set_uniform_mat4("view", view);
             shader_hdrcube.set_uniform_mat4("projection", projection);
+
             glViewport(0, 0, window_width, window_height);
             glDepthFunc(GL_LEQUAL); // 由于在shader中让天空盒的深度为1，所以需要加这一句
             object_hdr.draw(shader_hdrcube);
+            glDepthFunc(GL_LESS);
         }
+        
         
         // 绘制light
         glBindVertexArray(VAO);

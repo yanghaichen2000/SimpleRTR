@@ -63,7 +63,7 @@ public:
             // 将图片载入到纹理
             int tex_width, tex_height, nrComponents;
             stb::stbi_set_flip_vertically_on_load(true);
-            float* image = stb::stbi_loadf("obj/bridge.hdr", &tex_width, &tex_height, &nrComponents, 0);
+            float* image = stb::stbi_loadf(filename, &tex_width, &tex_height, &nrComponents, 0);
             if (image) {
                 cout << "texture::init() HDR texture loaded: " << filename << ", size = " << tex_width << 'x' << tex_height << endl;
             }
@@ -75,6 +75,10 @@ public:
             // 释放内存并解绑
             stb::stbi_image_free(image);
             glBindTexture(GL_TEXTURE_2D, 0);
+        }
+        else {
+            cout << "texture::init() error: unknown texture type = " << type << endl;
+            texture_id = 0;
         }
 	}
 
