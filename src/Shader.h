@@ -120,4 +120,9 @@ public:
         GLint location = glGetUniformLocation(Program, value_name);
         glUniformMatrix4fv(location, 1, GL_FALSE, glm::value_ptr(mat));
     }
+
+    void set_uniform_float(const char value_name[], GLfloat value) {
+        GLint location = glGetUniformLocation(Program, value_name);
+        glUniform1f(location, value);
+    }
 };

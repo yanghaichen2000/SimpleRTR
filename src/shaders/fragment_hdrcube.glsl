@@ -4,10 +4,11 @@ out vec4 FragColor;
 in vec3 TexCoords;
 
 uniform samplerCube skybox;
+uniform float lod_value;
 
 void main()
 {    
-    vec3 envColor = texture(skybox, TexCoords).rgb;
+    vec3 envColor = textureLod(skybox, TexCoords, 4.0f).rgb;
 
     envColor = envColor / (envColor + vec3(1.0));
     envColor = pow(envColor, vec3(1.0/2.2)); 

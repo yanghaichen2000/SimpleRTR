@@ -137,6 +137,7 @@ void main()
 
     // 计算fragment颜色
     color = vec4(ambient + direct_light_weight * (diffuse + specular), 1.0f);
+    //color = vec4(ambient, 1.0f);
 
     // gamma校正
     color = vec4(pow(color.x, 1.0f / 2.2f), pow(color.y, 1.0f / 2.2f), pow(color.z, 1.0f / 2.2f), 1.0f);

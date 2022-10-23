@@ -120,7 +120,8 @@ int main()
     Shader shader_hdr("src/shaders/vertex_hdr.glsl", "src/shaders/fragment_hdr.glsl");
     Shader shader_hdrcube("src/shaders/vertex_hdrcube.glsl", "src/shaders/fragment_hdrcube.glsl");
     Shader shader_irradiance("src/shaders/vertex_irradiance.glsl", "src/shaders/fragment_irradiance.glsl");
-
+    Shader shader_prefilter_hdri("src/shaders/vertex_prefilter_hdri.glsl", "src/shaders/fragment_prefilter_hdri.glsl");
+    Shader shader_brdf("src/shaders/vertex_precompute_brdf.glsl", "src/shaders/fragment_precompute_brdf.glsl");
     
     // 创建VBO（Vertex Buffer Objects）
     // VBO中存储了顶点的数据
@@ -191,7 +192,7 @@ int main()
     mat_yellow->add_color_map(tex_yellow);
 
     shared_ptr<material> mat_hdr_test = make_shared<material>();
-    shared_ptr<texture> tex_hdr_test = make_shared<texture>("obj/hdri/bridge.hdr", texture_type::hdr);
+    shared_ptr<texture> tex_hdr_test = make_shared<texture>("obj/hdri/court.hdr", texture_type::hdr);
     mat_hdr_test->add_color_map(tex_hdr_test);
 
 
@@ -243,7 +244,7 @@ int main()
     
 
     // 获取深度图并将其添加到材质material中
-    
+
     // 光源的M矩阵
     glm::mat4 model_light(1);
 
@@ -283,7 +284,15 @@ int main()
     mat_yellow->add_shadow_map(shadow_map_ptr);
 
 
+    
+
     // 将hdri转换为立方体贴图
+
+    // 启用立方体贴图之间的滤波
+    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+
+    // 设置0级贴图大小
+    int cube_map_size_0 = 1024;
 
     // 帧缓冲对象，用于记录圆柱投影转换到立方体贴图的结果
     unsigned int captureFBO, captureRBO;
@@ -292,7 +301,7 @@ int main()
 
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_size_0, cube_map_size_0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
     
     // 为立方体贴图分配缓存
@@ -303,7 +312,7 @@ int main()
     {
         // 格式为16位浮点数
         glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
-            512, 512, 0, GL_RGB, GL_FLOAT, nullptr);
+            cube_map_size_0, cube_map_size_0, 0, GL_RGB, GL_FLOAT, nullptr);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -330,7 +339,7 @@ int main()
     shader_hdr.set_uniform_mat4("projection", captureProjection);
 
     // 开始渲染六个面，并将渲染结果写入立方体贴图
-    glViewport(0, 0, 512, 512);
+    glViewport(0, 0, cube_map_size_0, cube_map_size_0);
     glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
     for (unsigned int i = 0; i < 6; ++i)
     {
@@ -344,6 +353,13 @@ int main()
         glDepthFunc(GL_LESS);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 为立方体贴图生成mipmap并设置三线性过滤，方便之后进行预滤波时使用
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
 
     
     // 根据立方体贴图计算辐照度图
@@ -394,8 +410,128 @@ int main()
         glDepthFunc(GL_LESS);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    
 
+
+
+    // 根据立方体贴图计算多粗糙度辐照度图
+
+    // 分配内存
+    unsigned int prefilterMap;
+    glGenTextures(1, &prefilterMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+    for (unsigned int i = 0; i < 6; ++i)
+    {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, cube_map_size_0, cube_map_size_0, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // 声明mipmap
+
+    // 帧缓冲对象，用于计算prefilter
+    unsigned int prefilterFBO, prefilterRBO;
+    glGenFramebuffers(1, &prefilterFBO);
+    glGenRenderbuffers(1, &prefilterRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, prefilterFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, prefilterRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 128, 128); // 这里分辨率设成多少都行，之后会再更改
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, prefilterRBO);
+
+    // 激活并设置shader
+    shader_prefilter_hdri.Use();
+    shader_prefilter_hdri.set_uniform_mat4("projection", captureProjection);
+
+    // 传入之前计算的立方体贴图
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+
+    // 开始渲染六个面
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    unsigned int maxMipLevels = 5;
+    for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
+    {
+        // 根据mipmap等级，设置渲染结果分辨率
+        unsigned int mipWidth = cube_map_size_0 * std::pow(0.5, mip);
+        unsigned int mipHeight = cube_map_size_0 * std::pow(0.5, mip);
+        glBindRenderbuffer(GL_RENDERBUFFER, prefilterRBO);
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
+        glViewport(0, 0, mipWidth, mipHeight);
+
+        float roughness = (float)mip / (float)(maxMipLevels - 1);
+        shader_prefilter_hdri.set_uniform_float("roughness", roughness);
+        for (unsigned int i = 0; i < 6; ++i)
+        {
+            shader_prefilter_hdri.set_uniform_mat4("view", captureViews[i]);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
+
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            glDepthFunc(GL_LEQUAL);
+            object_hdr.draw(shader_prefilter_hdri);
+            glDepthFunc(GL_LESS);
+        }
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+
+
+    // 预计算brdf
+
+    // 为图像分配空间
+    unsigned int brdfLUTTexture;
+    glGenTextures(1, &brdfLUTTexture);
+
+    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    // 创建帧缓冲对象
+    unsigned int brdfFBO, brdfRBO;
+    glGenFramebuffers(1, &brdfFBO);
+    glGenRenderbuffers(1, &brdfRBO);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, brdfFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, brdfRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
+
+    // 计算
+    glViewport(0, 0, 512, 512);
+    shader_brdf.Use();
+
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    unsigned int quadVAO, quadVBO;
+    float quadVertices[] = {
+        // positions        // texture Coords
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+            1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
+            1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    };
+    // setup plane VAO
+    glGenVertexArrays(1, &quadVAO);
+    glGenBuffers(1, &quadVBO);
+    glBindVertexArray(quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+    
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // 主循环
     while (!glfwWindowShouldClose(window)) {
@@ -487,7 +623,7 @@ int main()
             shader_hdrcube.Use();
 
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
             shader_hdrcube.set_uniform_mat4("view", view);
             shader_hdrcube.set_uniform_mat4("projection", projection);
 
@@ -518,7 +654,7 @@ int main()
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
             glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
             glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(projection));
-            
+
             // 绘制
             glDrawArrays(GL_TRIANGLES, 0, 36);
         }
