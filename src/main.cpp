@@ -122,6 +122,8 @@ int main()
     Shader shader_irradiance("src/shaders/vertex_irradiance.glsl", "src/shaders/fragment_irradiance.glsl");
     Shader shader_prefilter_hdri("src/shaders/vertex_prefilter_hdri.glsl", "src/shaders/fragment_prefilter_hdri.glsl");
     Shader shader_brdf("src/shaders/vertex_precompute_brdf.glsl", "src/shaders/fragment_precompute_brdf.glsl");
+    Shader shader_pbr("src/shaders/vertex_pbr.glsl", "src/shaders/fragment_pbr.glsl");
+
     
     // 创建VBO（Vertex Buffer Objects）
     // VBO中存储了顶点的数据
@@ -172,40 +174,53 @@ int main()
 
     // 定义材质
     shared_ptr<material> mat_cow = make_shared<material>();
-    shared_ptr<texture> tex_cow = make_shared<texture>("obj/spot_texture.png");
+    shared_ptr<texture_2D> tex_cow = make_shared<texture_2D>("obj/spot_texture.png");
     mat_cow->add_color_map(tex_cow);
     
     shared_ptr<material> mat_white = make_shared<material>();
-    shared_ptr<texture> tex_white = make_shared<texture>("obj/white.png");
+    shared_ptr<texture_2D> tex_white = make_shared<texture_2D>("obj/white.png");
     mat_white->add_color_map(tex_white);
 
     shared_ptr<material> mat_green = make_shared<material>();
-    shared_ptr<texture> tex_green = make_shared<texture>("obj/green.png");
+    shared_ptr<texture_2D> tex_green = make_shared<texture_2D>("obj/green.png");
     mat_green->add_color_map(tex_green);
 
     shared_ptr<material> mat_red = make_shared<material>();
-    shared_ptr<texture> tex_red = make_shared<texture>("obj/red.png");
+    shared_ptr<texture_2D> tex_red = make_shared<texture_2D>("obj/red.png");
     mat_red->add_color_map(tex_red);
 
     shared_ptr<material> mat_yellow = make_shared<material>();
-    shared_ptr<texture> tex_yellow = make_shared<texture>("obj/yellow.png");
+    shared_ptr<texture_2D> tex_yellow = make_shared<texture_2D>("obj/yellow.png");
     mat_yellow->add_color_map(tex_yellow);
 
     shared_ptr<material> mat_hdr_test = make_shared<material>();
-    shared_ptr<texture> tex_hdr_test = make_shared<texture>("obj/hdri/court.hdr", texture_type::hdr);
+    shared_ptr<texture_2D> tex_hdr_test = make_shared<texture_2D>("obj/hdri/bridge.hdr", texture_type::hdr);
     mat_hdr_test->add_color_map(tex_hdr_test);
 
+    shared_ptr<material> mat_pbr_test = make_shared<material>();
+    shared_ptr<texture_2D> tex_brick_color = make_shared<texture_2D>("obj/pbr/rustediron_color.png");
+    shared_ptr<texture_2D> tex_brick_normal = make_shared<texture_2D>("obj/pbr/rustediron_normal.png");
+    shared_ptr<texture_2D> tex_brick_metallic = make_shared<texture_2D>("obj/pbr/rustediron_metallic.png");
+    shared_ptr<texture_2D> tex_brick_roughness = make_shared<texture_2D>("obj/pbr/rustediron_roughness.png");
+    shared_ptr<texture_2D> tex_brick_ao = make_shared<texture_2D>("obj/pbr/ao_basic.png");
+    mat_pbr_test->add_color_map(tex_brick_color);
+    mat_pbr_test->add_normal_map(tex_brick_normal);
+    mat_pbr_test->add_metallic_map(tex_brick_metallic);
+    mat_pbr_test->add_roughness_map(tex_brick_roughness);
+    mat_pbr_test->add_ao_map(tex_brick_ao);
+
+    shared_ptr<material> mat_empty = make_shared<material>();
 
     // 材质表
     unordered_map<string, shared_ptr<material>> material_dict;
     material_dict[string("hdr_cube")] = mat_hdr_test;
-    material_dict[string("cube")] = mat_yellow;
-    material_dict[string("cow")] = mat_cow;
+    material_dict[string("cube")] = mat_pbr_test;
+    material_dict[string("cow")] = mat_pbr_test;
     material_dict[string("plane_001")] = mat_red;
-    material_dict[string("plane_002")] = mat_white;
-    material_dict[string("plane_003")] = mat_white;
+    material_dict[string("plane_002")] = mat_pbr_test;
+    material_dict[string("plane_003")] = mat_pbr_test;
     material_dict[string("plane_004")] = mat_green;
-    material_dict[string("plane_005")] = mat_white;
+    material_dict[string("plane_005")] = mat_pbr_test;
 
 
     // 读取并buffer模型
@@ -276,7 +291,7 @@ int main()
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     
     // 将shadow_map存入material中
-    shared_ptr<texture> shadow_map_ptr = make_shared<texture>(depthMap);
+    shared_ptr<texture_2D> shadow_map_ptr = make_shared<texture_2D>(depthMap);
     mat_cow->add_shadow_map(shadow_map_ptr);
     mat_white->add_shadow_map(shadow_map_ptr);
     mat_green->add_shadow_map(shadow_map_ptr);
@@ -533,6 +548,24 @@ int main()
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+
+    // 为pbr shader设置环境光贴图
+    shared_ptr<texture_cube> tex_irradiance = make_shared<texture_cube>(irradianceMap);
+    shared_ptr<texture_cube> tex_prefilter = make_shared<texture_cube>(prefilterMap);
+    shared_ptr<texture_2D> tex_brdf_lut = make_shared<texture_2D>(brdfLUTTexture);
+    mat_pbr_test->add_irradiance_map(tex_irradiance);
+    mat_pbr_test->add_prefilter_map(tex_prefilter);
+    mat_pbr_test->add_brdf_lut(tex_brdf_lut);
+
+
+    // 为hdrcube shader设置贴图
+    shader_hdrcube.Use();
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glUniform1i(glGetUniformLocation(shader_hdrcube.Program, "skybox"), 1);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+
     // 主循环
     while (!glfwWindowShouldClose(window)) {
         // Set frame time
@@ -568,7 +601,8 @@ int main()
         glm::mat4 model(1);
         
         
-        // 绘制场景
+        /*
+        // 绘制场景(blinn phong)
         {
             // 激活着色器
             shader_main.Use();
@@ -596,6 +630,34 @@ int main()
             glViewport(0, 0, window_width, window_height);
             object_main.draw(shader_main);
         }
+        */
+
+        
+        // 绘制场景(pbr)
+        {
+            // 激活着色器
+            shader_pbr.Use();
+
+            // 设置uniform
+            shader_pbr.set_uniform_mat4("model", model);
+            shader_pbr.set_uniform_mat4("view", view);
+            shader_pbr.set_uniform_mat4("projection", projection);
+
+            shader_pbr.set_uniform_vec3("viewPos", camera.Position);
+            shader_pbr.set_uniform_vec3("lightColor", 5.0f, 5.0f, 5.0f);
+            shader_pbr.set_uniform_vec3("lightPos", lightPos);
+            shader_pbr.set_uniform_vec3("lightDir", 1.0f, 1.0f, 1.0f);
+
+            shader_pbr.set_uniform_mat4("model_light", model_light);
+            shader_pbr.set_uniform_mat4("view_light", view_light);
+            shader_pbr.set_uniform_mat4("projection_light", projection_light);
+
+            shader_pbr.set_uniform_vec3("camPos", camera.Position);
+
+            // 绘制
+            glViewport(0, 0, window_width, window_height);
+            object_main.draw(shader_pbr);
+        }
         
         
         /*
@@ -614,16 +676,15 @@ int main()
             glViewport(0, 0, window_width, window_height);
             glDepthFunc(GL_LEQUAL); // 由于在shader中让天空盒的深度为1，所以需要加这一句
             object_hdr.draw(shader_hdr);
+            glDepthFunc(GL_LESS);
         }
         */
 
-        
+        ///*
         // 绘制天空盒（根据转换的立方体贴图绘制）
         {
             shader_hdrcube.Use();
-
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
+            
             shader_hdrcube.set_uniform_mat4("view", view);
             shader_hdrcube.set_uniform_mat4("projection", projection);
 
@@ -632,6 +693,7 @@ int main()
             object_hdr.draw(shader_hdrcube);
             glDepthFunc(GL_LESS);
         }
+        //*/
         
         
         // 绘制light

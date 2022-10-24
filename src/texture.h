@@ -6,13 +6,20 @@ struct texture_type{
     enum {rgb, hdr};
 };
 
+
 class texture {
+public:
+    virtual void make_uniform(Shader shader, const char name_in_shader[], int index) = 0;
+};
+
+
+class texture_2D : public texture {
 public:
 
 	GLuint texture_id;
 	
     // 从图片中载入
-	texture(const char filename[], int type = texture_type::rgb, GLint repeat = GL_REPEAT, GLint interpolate = GL_LINEAR) {
+	texture_2D(const char filename[], int type = texture_type::rgb, GLint repeat = GL_REPEAT, GLint interpolate = GL_LINEAR) {
         
         if (type == texture_type::rgb) {
             // 创建纹理
@@ -26,12 +33,12 @@ public:
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 
             // 设置插值方式
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            
             // 将图片载入到纹理
             int tex_width, tex_height, nrComponents;
-            unsigned char* image = stb::stbi_load(filename, &tex_width, &tex_height, &nrComponents, 3);
+            unsigned char* image = stb::stbi_load(filename, &tex_width, &tex_height, &nrComponents, 3);        
             if (image) {
                 cout << "texture::init() texture loaded: " << filename << ", size = " << tex_width << 'x' << tex_height << endl;
             }
@@ -40,6 +47,7 @@ public:
             }
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, tex_width, tex_height, 0, GL_RGB, GL_UNSIGNED_BYTE, image);
             glGenerateMipmap(GL_TEXTURE_2D); // 生成mipmap
+            
 
             // 释放内存并解绑
             stb::stbi_image_free(image);
@@ -83,16 +91,38 @@ public:
 	}
 
     // 设置现有texture
-    texture(GLuint texture_id_init) {
+    texture_2D(GLuint texture_id_init) {
         texture_id = texture_id_init;
 
         cout << "texture::init() texture loaded from gl_texture";
     }
     
     // 将该纹理设置为uniform变量
-    void make_uniform(Shader shader, const char name_in_shader[], int index) {
+    void make_uniform(Shader shader, const char name_in_shader[], int index) override {
         glActiveTexture(GL_TEXTURE0 + index);
         glBindTexture(GL_TEXTURE_2D, texture_id);
+        glUniform1i(glGetUniformLocation(shader.Program, name_in_shader), index);
+    }
+};
+
+
+class texture_cube : public texture {
+public:
+
+    GLuint texture_id;
+
+    // 设置现有texture
+    texture_cube(GLuint texture_id_init) {
+        texture_id = texture_id_init;
+
+        cout << "texture::init() texture loaded from gl_texture";
+    }
+
+    
+    // 将该纹理设置为uniform变量
+    void make_uniform(Shader shader, const char name_in_shader[], int index) override {
+        glActiveTexture(GL_TEXTURE0 + index);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, texture_id);
         glUniform1i(glGetUniformLocation(shader.Program, name_in_shader), index);
     }
 };

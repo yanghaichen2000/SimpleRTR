@@ -5,46 +5,70 @@
 
 class material {
 public:
-	vector<shared_ptr<texture>> color_map_list;
-	vector<shared_ptr<texture>> shadow_map_list;
-	vector<shared_ptr<texture>> normal_map_list;
-	vector<shared_ptr<texture>> metallic_map_list;
-	vector<shared_ptr<texture>> roughness_map_list;
-	vector<shared_ptr<texture>> ao_map_list;
+	vector<shared_ptr<texture_2D>> color_map_list;
+	vector<shared_ptr<texture_2D>> shadow_map_list;
+	vector<shared_ptr<texture_2D>> normal_map_list;
+	vector<shared_ptr<texture_2D>> metallic_map_list;
+	vector<shared_ptr<texture_2D>> roughness_map_list;
+	vector<shared_ptr<texture_2D>> ao_map_list;
+
+	vector<shared_ptr<texture_cube>> irradiance_map_list;
+	vector<shared_ptr<texture_cube>> prefilter_map_list;
+	vector<shared_ptr<texture_2D>> brdf_lut_list;
 
 	
 	material() {
-		color_map_list = vector<shared_ptr<texture>>();
-		shadow_map_list = vector<shared_ptr<texture>>();
-		normal_map_list = vector<shared_ptr<texture>>();
-		metallic_map_list = vector<shared_ptr<texture>>();
-		roughness_map_list = vector<shared_ptr<texture>>();
-		ao_map_list = vector<shared_ptr<texture>>();
+		color_map_list = vector<shared_ptr<texture_2D>>();
+		shadow_map_list = vector<shared_ptr<texture_2D>>();
+		normal_map_list = vector<shared_ptr<texture_2D>>();
+		metallic_map_list = vector<shared_ptr<texture_2D>>();
+		roughness_map_list = vector<shared_ptr<texture_2D>>();
+		ao_map_list = vector<shared_ptr<texture_2D>>();
+
+		irradiance_map_list = vector<shared_ptr<texture_cube>>();
+		prefilter_map_list = vector<shared_ptr<texture_cube>>();
+		brdf_lut_list = vector<shared_ptr<texture_2D>>();
 	}
 
 
 	// 添加纹理。这里都是原始版本的纹理，而映射等操作放在shader中进行
 
-	void add_color_map(shared_ptr<texture> color_map_ptr) {
+	void add_color_map(shared_ptr<texture_2D> color_map_ptr) {
 		color_map_list.push_back(color_map_ptr);
 	}
 
-	void add_shadow_map(shared_ptr<texture> shadow_map_ptr) {
+	void add_shadow_map(shared_ptr<texture_2D> shadow_map_ptr) {
 		shadow_map_list.push_back(shadow_map_ptr);
 	}
 
-	void add_normal_map(shared_ptr<texture> normal_map_ptr) {
+	void add_normal_map(shared_ptr<texture_2D> normal_map_ptr) {
 		normal_map_list.push_back(normal_map_ptr);
 	}
-	void add_metallic_map(shared_ptr<texture> metallic_map_ptr) {
+
+	void add_metallic_map(shared_ptr<texture_2D> metallic_map_ptr) {
 		metallic_map_list.push_back(metallic_map_ptr);
 	}
-	void add_roughness_map(shared_ptr<texture> roughness_map_ptr) {
+
+	void add_roughness_map(shared_ptr<texture_2D> roughness_map_ptr) {
 		roughness_map_list.push_back(roughness_map_ptr);
 	}
-	void add_ao_map(shared_ptr<texture> ao_map_ptr) {
+
+	void add_ao_map(shared_ptr<texture_2D> ao_map_ptr) {
 		ao_map_list.push_back(ao_map_ptr);
 	}
+
+	void add_irradiance_map(shared_ptr<texture_cube> irradiance_map_ptr) {
+		irradiance_map_list.push_back(irradiance_map_ptr);
+	}
+
+	void add_prefilter_map(shared_ptr<texture_cube> prefilter_map_ptr) {
+		prefilter_map_list.push_back(prefilter_map_ptr);
+	}
+
+	void add_brdf_lut(shared_ptr<texture_2D> brdf_lut_ptr) {
+		brdf_lut_list.push_back(brdf_lut_ptr);
+	}
+
 
 
 	// 将纹理加载到shader中
@@ -119,6 +143,33 @@ public:
 			ao_map_name[7] = '0' + ao_map_index; // 确定shader中的变量名
 			ao_map_ptr->make_uniform(shader, ao_map_name, texture_index);
 			ao_map_index++;
+			texture_index++;
+		}
+
+		// 传入irradiance_map
+		int irradiance_map_index = 0;
+		char irradiance_map_name[] = "irradianceMap";
+		for (shared_ptr<texture> irradiance_map_ptr : irradiance_map_list) {
+			irradiance_map_ptr->make_uniform(shader, irradiance_map_name, texture_index);
+			irradiance_map_index++;
+			texture_index++;
+		}
+
+		// 传入prefilter_map
+		int prefilter_map_index = 0;
+		char prefilter_map_name[] = "prefilterMap";
+		for (shared_ptr<texture> prefilter_map_ptr : prefilter_map_list) {
+			prefilter_map_ptr->make_uniform(shader, prefilter_map_name, texture_index);
+			prefilter_map_index++;
+			texture_index++;
+		}
+
+		// 传入brdf_lut
+		int brdf_lut_index = 0;
+		char brdf_lut_name[] = "brdfLUT";
+		for (shared_ptr<texture> brdf_lut_ptr : brdf_lut_list) {
+			brdf_lut_ptr->make_uniform(shader, brdf_lut_name, texture_index);
+			brdf_lut_index++;
 			texture_index++;
 		}
 	}
