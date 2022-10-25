@@ -19,7 +19,7 @@ public:
 	GLuint texture_id;
 	
     // 从图片中载入
-	texture_2D(const char filename[], int type = texture_type::rgb, GLint repeat = GL_REPEAT, GLint interpolate = GL_LINEAR) {
+	texture_2D(string filename, int type = texture_type::rgb) {
         
         if (type == texture_type::rgb) {
             // 创建纹理
@@ -38,7 +38,7 @@ public:
             
             // 将图片载入到纹理
             int tex_width, tex_height, nrComponents;
-            unsigned char* image = stb::stbi_load(filename, &tex_width, &tex_height, &nrComponents, 3);        
+            unsigned char* image = stb::stbi_load(filename.c_str(), &tex_width, &tex_height, &nrComponents, 3);
             if (image) {
                 cout << "texture::init() texture loaded: " << filename << ", size = " << tex_width << 'x' << tex_height << endl;
             }
@@ -71,7 +71,7 @@ public:
             // 将图片载入到纹理
             int tex_width, tex_height, nrComponents;
             stb::stbi_set_flip_vertically_on_load(true);
-            float* image = stb::stbi_loadf(filename, &tex_width, &tex_height, &nrComponents, 0);
+            float* image = stb::stbi_loadf(filename.c_str(), &tex_width, &tex_height, &nrComponents, 0);
             if (image) {
                 cout << "texture::init() HDR texture loaded: " << filename << ", size = " << tex_width << 'x' << tex_height << endl;
             }

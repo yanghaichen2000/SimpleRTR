@@ -70,9 +70,24 @@ public:
 	}
 
 
+	// 添加整套pbr贴图
+	void add_pbr_texture(string file_name, string file_type) {
+		add_color_map(make_shared<texture_2D>(file_name + "_color." + file_type));
+		add_normal_map(make_shared<texture_2D>(file_name + "_normal." + file_type));
+		add_metallic_map(make_shared<texture_2D>(file_name + "_metallic." + file_type));
+		add_roughness_map(make_shared<texture_2D>(file_name + "_roughness." + file_type));
+		add_ao_map(make_shared<texture_2D>(file_name + "_ao." + file_type));
+	}
+
+	// 添加整套ibl贴图
+	void add_ibl_texture(GLuint irradiance_map, GLuint prefilter_map, GLuint brdf_lut) {
+		add_irradiance_map(make_shared<texture_cube>(irradiance_map));
+		add_prefilter_map(make_shared<texture_cube>(prefilter_map));
+		add_brdf_lut(make_shared<texture_2D>(brdf_lut));
+	}
+
 
 	// 将纹理加载到shader中
-
 	void make_uniform(Shader shader) {
 		shader.Use();
 

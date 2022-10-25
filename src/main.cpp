@@ -1,6 +1,6 @@
 #include "global.h"
 #include "object.h"
-
+#include "hdri.h"
 
 //#define TEST_MODE_SIMPLERTR
 
@@ -194,20 +194,11 @@ int main()
     mat_yellow->add_color_map(tex_yellow);
 
     shared_ptr<material> mat_hdr_test = make_shared<material>();
-    shared_ptr<texture_2D> tex_hdr_test = make_shared<texture_2D>("obj/hdri/bridge.hdr", texture_type::hdr);
+    shared_ptr<texture_2D> tex_hdr_test = make_shared<texture_2D>("obj/hdri/court.hdr", texture_type::hdr);
     mat_hdr_test->add_color_map(tex_hdr_test);
 
     shared_ptr<material> mat_pbr_test = make_shared<material>();
-    shared_ptr<texture_2D> tex_brick_color = make_shared<texture_2D>("obj/pbr/rustediron_color.png");
-    shared_ptr<texture_2D> tex_brick_normal = make_shared<texture_2D>("obj/pbr/rustediron_normal.png");
-    shared_ptr<texture_2D> tex_brick_metallic = make_shared<texture_2D>("obj/pbr/rustediron_metallic.png");
-    shared_ptr<texture_2D> tex_brick_roughness = make_shared<texture_2D>("obj/pbr/rustediron_roughness.png");
-    shared_ptr<texture_2D> tex_brick_ao = make_shared<texture_2D>("obj/pbr/ao_basic.png");
-    mat_pbr_test->add_color_map(tex_brick_color);
-    mat_pbr_test->add_normal_map(tex_brick_normal);
-    mat_pbr_test->add_metallic_map(tex_brick_metallic);
-    mat_pbr_test->add_roughness_map(tex_brick_roughness);
-    mat_pbr_test->add_ao_map(tex_brick_ao);
+    mat_pbr_test->add_pbr_texture("obj/pbr/rustediron", "png");
 
     shared_ptr<material> mat_empty = make_shared<material>();
 
@@ -289,6 +280,7 @@ int main()
         object_main.draw(shader_depth);
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     
     // 将shadow_map存入material中
     shared_ptr<texture_2D> shadow_map_ptr = make_shared<texture_2D>(depthMap);
@@ -297,271 +289,20 @@ int main()
     mat_green->add_shadow_map(shadow_map_ptr);
     mat_red->add_shadow_map(shadow_map_ptr);
     mat_yellow->add_shadow_map(shadow_map_ptr);
-
-
+    mat_pbr_test->add_shadow_map(shadow_map_ptr);
     
 
-    // 将hdri转换为立方体贴图
-
-    // 启用立方体贴图之间的滤波
-    glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-
-    // 设置0级贴图大小
-    int cube_map_size_0 = 1024;
-
-    // 帧缓冲对象，用于记录圆柱投影转换到立方体贴图的结果
-    unsigned int captureFBO, captureRBO;
-    glGenFramebuffers(1, &captureFBO);
-    glGenRenderbuffers(1, &captureRBO);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, cube_map_size_0, cube_map_size_0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+    // 读取环境纹理 
+    hdri hdri_1("obj/hdri/court.hdr");
     
-    // 为立方体贴图分配缓存
-    unsigned int envCubemap;
-    glGenTextures(1, &envCubemap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        // 格式为16位浮点数
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
-            cube_map_size_0, cube_map_size_0, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // 设置V矩阵和P矩阵
-    // P矩阵的fov为pi/2
-    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    // V矩阵的ViewPos为原点，方向为六个坐标轴方向
-    glm::mat4 captureViews[] =
-    {
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-       glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-    };
-
-    // 使用渲染hdri的shader
-    shader_hdr.Use();
-    shader_hdr.set_uniform_mat4("projection", captureProjection);
-
-    // 开始渲染六个面，并将渲染结果写入立方体贴图
-    glViewport(0, 0, cube_map_size_0, cube_map_size_0);
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        // 传入当前面的V矩阵
-        shader_hdr.set_uniform_mat4("view", captureViews[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glDepthFunc(GL_LEQUAL);
-        object_hdr.draw(shader_hdr);
-        glDepthFunc(GL_LESS);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    // 为立方体贴图生成mipmap并设置三线性过滤，方便之后进行预滤波时使用
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-
-
-    
-    // 根据立方体贴图计算辐照度图
-
-    // 为辐照度图分配内存
-    unsigned int irradianceMap;
-    glGenTextures(1, &irradianceMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // 帧缓冲对象，用于记录计算辐照度
-    unsigned int irradianceFBO, irradianceRBO;
-    glGenFramebuffers(1, &irradianceFBO);
-    glGenRenderbuffers(1, &irradianceRBO);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, irradianceFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, irradianceRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, irradianceRBO);
-
-    // 使用计算irradiance的shader
-    shader_irradiance.Use();
-    shader_irradiance.set_uniform_mat4("projection", captureProjection);
-
-    // 传入之前计算的立方体贴图
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-
-    // 开始渲染六个面，并将渲染结果写入立方体贴图
-    glViewport(0, 0, 32, 32);
-    glBindFramebuffer(GL_FRAMEBUFFER, irradianceFBO);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        shader_irradiance.set_uniform_mat4("view", captureViews[i]);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap, 0);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glDepthFunc(GL_LEQUAL);
-        object_hdr.draw(shader_irradiance);
-        glDepthFunc(GL_LESS);
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-
-    // 根据立方体贴图计算多粗糙度辐照度图
-
-    // 分配内存
-    unsigned int prefilterMap;
-    glGenTextures(1, &prefilterMap);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, prefilterMap);
-    for (unsigned int i = 0; i < 6; ++i)
-    {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, cube_map_size_0, cube_map_size_0, 0, GL_RGB, GL_FLOAT, nullptr);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP); // 声明mipmap
-
-    // 帧缓冲对象，用于计算prefilter
-    unsigned int prefilterFBO, prefilterRBO;
-    glGenFramebuffers(1, &prefilterFBO);
-    glGenRenderbuffers(1, &prefilterRBO);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, prefilterFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, prefilterRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 128, 128); // 这里分辨率设成多少都行，之后会再更改
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, prefilterRBO);
-
-    // 激活并设置shader
-    shader_prefilter_hdri.Use();
-    shader_prefilter_hdri.set_uniform_mat4("projection", captureProjection);
-
-    // 传入之前计算的立方体贴图
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-
-    // 开始渲染六个面
-    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    unsigned int maxMipLevels = 5;
-    for (unsigned int mip = 0; mip < maxMipLevels; ++mip)
-    {
-        // 根据mipmap等级，设置渲染结果分辨率
-        unsigned int mipWidth = cube_map_size_0 * std::pow(0.5, mip);
-        unsigned int mipHeight = cube_map_size_0 * std::pow(0.5, mip);
-        glBindRenderbuffer(GL_RENDERBUFFER, prefilterRBO);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mipWidth, mipHeight);
-        glViewport(0, 0, mipWidth, mipHeight);
-
-        float roughness = (float)mip / (float)(maxMipLevels - 1);
-        shader_prefilter_hdri.set_uniform_float("roughness", roughness);
-        for (unsigned int i = 0; i < 6; ++i)
-        {
-            shader_prefilter_hdri.set_uniform_mat4("view", captureViews[i]);
-            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilterMap, mip);
-
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-            glDepthFunc(GL_LEQUAL);
-            object_hdr.draw(shader_prefilter_hdri);
-            glDepthFunc(GL_LESS);
-        }
-    }
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
-
-    // 预计算brdf
-
-    // 为图像分配空间
-    unsigned int brdfLUTTexture;
-    glGenTextures(1, &brdfLUTTexture);
-
-    glBindTexture(GL_TEXTURE_2D, brdfLUTTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG16F, 512, 512, 0, GL_RG, GL_FLOAT, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-    // 创建帧缓冲对象
-    unsigned int brdfFBO, brdfRBO;
-    glGenFramebuffers(1, &brdfFBO);
-    glGenRenderbuffers(1, &brdfRBO);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, brdfFBO);
-    glBindRenderbuffer(GL_RENDERBUFFER, brdfRBO);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, brdfLUTTexture, 0);
-
-    // 计算
-    glViewport(0, 0, 512, 512);
-    shader_brdf.Use();
-
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    unsigned int quadVAO, quadVBO;
-    float quadVertices[] = {
-        // positions        // texture Coords
-        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-            1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-            1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
-    };
-    // setup plane VAO
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-    
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    glBindVertexArray(0);
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-
     // 为pbr shader设置环境光贴图
-    shared_ptr<texture_cube> tex_irradiance = make_shared<texture_cube>(irradianceMap);
-    shared_ptr<texture_cube> tex_prefilter = make_shared<texture_cube>(prefilterMap);
-    shared_ptr<texture_2D> tex_brdf_lut = make_shared<texture_2D>(brdfLUTTexture);
-    mat_pbr_test->add_irradiance_map(tex_irradiance);
-    mat_pbr_test->add_prefilter_map(tex_prefilter);
-    mat_pbr_test->add_brdf_lut(tex_brdf_lut);
-
+    mat_pbr_test->add_ibl_texture(hdri_1.irradianceMap, hdri_1.prefilterMap, hdri_1.brdfLUTTexture);
+    
 
     // 为hdrcube shader设置贴图
     shader_hdrcube.Use();
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, hdri_1.envCubemap);
     glUniform1i(glGetUniformLocation(shader_hdrcube.Program, "skybox"), 1);
     glBindTexture(GL_TEXTURE_2D, 0);
 
